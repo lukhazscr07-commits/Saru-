@@ -1,0 +1,265 @@
+<!DOCTYPE html>
+<html lang="pt-BR">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>A Minha Galeria</title>
+    <style>
+        /* --- ESTILOS GERAIS --- */
+        :root {
+            --bg-color: #121212;
+            --text-color: #ffffff;
+            --accent-color: #ff0040;
+        }
+
+        * {
+            margin: 0;
+            padding: 0;
+            box-sizing: border-box;
+            font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif;
+        }
+
+        body {
+            background-color: var(--bg-color);
+            color: var(--text-color);
+            padding: 20px;
+        }
+
+        /* --- CABEÇALHO --- */
+        header {
+            text-align: center;
+            margin-bottom: 30px;
+            padding: 20px 0;
+        }
+
+        .logo {
+            max-width: 150px;
+            max-height: 150px;
+            margin-bottom: 20px;
+            object-fit: contain;
+        }
+
+        header h1 {
+            font-size: 2.5rem;
+            font-weight: 300;
+            letter-spacing: 2px;
+            text-transform: uppercase;
+        }
+
+        header h1 span {
+            color: var(--accent-color);
+            font-weight: 600;
+        }
+
+        /* --- BOTÃO DE UPLOAD --- */
+        .upload-container {
+            text-align: center;
+            margin-bottom: 40px;
+        }
+
+        .upload-btn {
+            background-color: var(--accent-color);
+            color: white;
+            padding: 12px 24px;
+            border: none;
+            border-radius: 8px;
+            font-size: 1.1rem;
+            cursor: pointer;
+            transition: background-color 0.3s;
+            font-weight: bold;
+        }
+
+        .upload-btn:hover {
+            background-color: #f6023f;
+        }
+
+        /* Esconde o input original feio do navegador */
+        input[type="file"] {
+            display: none;
+        }
+
+        /* --- GRID DA GALERIA --- */
+        .gallery {
+            display: grid;
+            grid-template-columns: repeat(auto-fit, minmax(280px, 1fr));
+            gap: 20px;
+            max-width: 1200px;
+            margin: 0 auto;
+        }
+
+        .media-item {
+            position: relative;
+            overflow: hidden;
+            border-radius: 12px;
+            cursor: pointer;
+            aspect-ratio: 1 / 1;
+            box-shadow: 0 10px 20px rgba(0,0,0,0.3);
+            transition: transform 0.3s ease;
+        }
+
+        .media-item:hover {
+            transform: translateY(-5px);
+        }
+
+        .media-item img, .media-item video {
+            width: 100%;
+            height: 100%;
+            object-fit: cover;
+            transition: transform 0.5s ease, filter 0.5s ease;
+        }
+
+        .media-item:hover img, .media-item:hover video {
+            transform: scale(1.1);
+            filter: brightness(0.7);
+        }
+
+        .play-icon {
+            position: absolute;
+            top: 50%;
+            left: 50%;
+            transform: translate(-50%, -50%);
+            font-size: 3rem;
+            color: white;
+            opacity: 0.8;
+            pointer-events: none;
+            text-shadow: 0 2px 10px rgba(0,0,0,0.5);
+        }
+
+        /* --- LIGHTBOX (MODAL) --- */
+        .modal {
+            display: none;
+            position: fixed;
+            z-index: 999;
+            top: 0;
+            left: 0;
+            width: 100%;
+            height: 100%;
+            background-color: rgba(0, 0, 0, 0.9);
+            justify-content: center;
+            align-items: center;
+        }
+
+        .modal-content {
+            max-width: 90%;
+            max-height: 90%;
+            border-radius: 8px;
+            box-shadow: 0 0 30px rgba(0,0,0,0.8);
+        }
+
+        .close {
+            position: absolute;
+            top: 20px;
+            right: 40px;
+            color: white;
+            font-size: 40px;
+            font-weight: bold;
+            cursor: pointer;
+            transition: color 0.3s;
+        }
+
+        .close:hover {
+            color: var(--accent-color);
+        }
+    </style>
+</head>
+<body>
+
+    <header>
+        <img src="Ativo 11.png" alt="O Meu Logótipo" class="logo">
+        <h1>Minha <span>Galeria</span></h1>
+        <p>Fotos e Vídeos</p>
+    </header>
+
+    <div class="upload-container">
+        <label for="fileInput" class="upload-btn">
+            Carregar Fotos e Vídeos
+        </label>
+        <input type="file" id="fileInput" multiple accept="image/*,video/*">
+    </div>
+
+    <main class="gallery" id="galleryContainer">
+        </main>
+
+    <div id="mediaModal" class="modal">
+        <span class="close" onclick="closeModal()">&times;</span>
+        <div id="modalBody" style="display: flex; justify-content: center; align-items: center; width: 100%; height: 100%;">
+        </div>
+    </div>
+
+    <script>
+        // --- LÓGICA DE CARREGAMENTO DE ARQUIVOS ---
+        const fileInput = document.getElementById('fileInput');
+        const galleryContainer = document.getElementById('galleryContainer');
+
+        fileInput.addEventListener('change', function(event) {
+            const files = event.target.files;
+            
+            // Limpa a galeria atual se você quiser carregar novos arquivos
+            galleryContainer.innerHTML = '';
+
+            for (let i = 0; i < files.length; i++) {
+                const file = files[i];
+                const fileURL = URL.createObjectURL(file); // Cria um link temporário para o arquivo local
+                
+                const mediaDiv = document.createElement('div');
+                mediaDiv.className = 'media-item';
+
+                // Verifica se é imagem ou vídeo
+                if (file.type.startsWith('image/')) {
+                    mediaDiv.innerHTML = `<img src="${fileURL}" alt="Imagem carregada">`;
+                    mediaDiv.onclick = () => openModal('image', fileURL);
+                } 
+                else if (file.type.startsWith('video/')) {
+                    mediaDiv.innerHTML = `
+                        <video src="${fileURL}" muted loop onmouseover="this.play()" onmouseout="this.pause()"></video>
+                        <div class="play-icon">▶</div>
+                    `;
+                    mediaDiv.onclick = () => openModal('video', fileURL);
+                }
+
+                galleryContainer.appendChild(mediaDiv);
+            }
+        });
+
+        // --- LÓGICA DO LIGHTBOX (MODAL) ---
+        const modal = document.getElementById("mediaModal");
+        const modalBody = document.getElementById("modalBody");
+
+        function openModal(type, url) {
+            modal.style.display = "flex";
+            modalBody.innerHTML = '';
+
+            if (type === 'image') {
+                const img = document.createElement('img');
+                img.src = url;
+                img.className = 'modal-content';
+                modalBody.appendChild(img);
+            } else if (type === 'video') {
+                const video = document.createElement('video');
+                video.src = url;
+                video.className = 'modal-content';
+                video.controls = true;
+                video.autoplay = true;
+                modalBody.appendChild(video);
+            }
+        }
+
+        function closeModal() {
+            modal.style.display = "none";
+            modalBody.innerHTML = ''; 
+        }
+
+        modal.addEventListener('click', function(e) {
+            if (e.target === modal || e.target === modalBody) {
+                closeModal();
+            }
+        });
+
+        document.addEventListener('keydown', function(e) {
+            if (e.key === "Escape") {
+                closeModal();
+            }
+        });
+    </script>
+</body>
+</html>
