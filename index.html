@@ -108,42 +108,35 @@
             position: relative;
             overflow: hidden;
             border-radius: 12px;
-            cursor: pointer;
             aspect-ratio: 1 / 1;
             box-shadow: 0 10px 20px rgba(0,0,0,0.3);
-            transition: transform 0.3s ease;
-            background-color: #222; /* Fundo escuro enquanto carrega */
+            background-color: #000; /* Fundo preto para mídias */
         }
 
-        .media-item:hover {
-            transform: translateY(-5px);
-        }
-
-        .media-item img, .media-item video {
+        /* Estilos apenas para imagens */
+        .media-item img {
             width: 100%;
             height: 100%;
             object-fit: cover;
             transition: transform 0.5s ease, filter 0.5s ease;
+            cursor: pointer;
         }
 
-        .media-item:hover img, .media-item:hover video {
+        .media-item:hover img {
             transform: scale(1.1);
             filter: brightness(0.7);
         }
 
-        .play-icon {
-            position: absolute;
-            top: 50%;
-            left: 50%;
-            transform: translate(-50%, -50%);
-            font-size: 3rem;
-            color: white;
-            opacity: 0.8;
-            pointer-events: none;
-            text-shadow: 0 2px 10px rgba(0,0,0,0.5);
+        /* Estilos e Player para os vídeos */
+        .media-item video {
+            width: 100%;
+            height: 100%;
+            object-fit: cover; /* Preenche todo o quadrado */
+            border-radius: 12px;
+            outline: none;
         }
 
-        /* --- LIGHTBOX (MODAL) --- */
+        /* --- LIGHTBOX (MODAL APENAS PARA FOTOS AGORA) --- */
         .modal {
             display: none;
             position: fixed;
@@ -183,7 +176,7 @@
 <body>
 
     <header>
-        <img src="logo.png" alt="O Meu Logótipo" class="logo" onerror="this.style.display='none'">
+        <img src="Ativo 11.png" alt="O Meu Logótipo" class="logo" onerror="this.style.display='none'">
         <h1>Minha <span>Galeria</span></h1>
         <p>Fotos e Vídeos</p>
     </header>
@@ -210,12 +203,11 @@
         const fileInput = document.getElementById('fileInput');
         let db;
 
-        // --- 1. CONFIGURAÇÃO DA BASE DE DADOS DO NAVEGADOR (IndexedDB) ---
+        // --- 1. CONFIGURAÇÃO DA BASE DE DADOS DO NAVEGADOR ---
         const request = indexedDB.open("MinhaGaleriaDB", 1);
 
         request.onupgradeneeded = function(event) {
             db = event.target.result;
-            // Cria um "cofre" chamado "medias" para guardar os arquivos
             if (!db.objectStoreNames.contains("medias")) {
                 db.createObjectStore("medias", { autoIncrement: true });
             }
@@ -223,7 +215,6 @@
 
         request.onsuccess = function(event) {
             db = event.target.result;
-            // Assim que a página abre e conecta ao banco, carrega as mídias salvas
             loadMediaFromDB();
         };
 
@@ -232,7 +223,7 @@
             alert("O seu navegador não permite guardar ficheiros localmente.");
         };
 
-        // --- 2. SALVAR NOVOS ARQUIVOS QUANDO ESCOLHIDOS ---
+        // --- 2. SALVAR NOVOS ARQUIVOS ---
         fileInput.addEventListener('change', function(event) {
             const files = event.target.files;
             
@@ -241,16 +232,14 @@
 
             for (let i = 0; i < files.length; i++) {
                 const file = files[i];
-                // Guarda o ficheiro no banco de dados
                 store.add(file);
-                // Já mostra na tela instantaneamente
                 displayMediaOnScreen(file);
             }
         });
 
-        // --- 3. CARREGAR ARQUIVOS SALVOS AO ABRIR A PÁGINA ---
+        // --- 3. CARREGAR ARQUIVOS ---
         function loadMediaFromDB() {
-            galleryContainer.innerHTML = ''; // Limpa a tela
+            galleryContainer.innerHTML = ''; 
             const transaction = db.transaction(["medias"], "readonly");
             const store = transaction.objectStore("medias");
             const getAllRequest = store.getAll();
@@ -263,41 +252,42 @@
             };
         }
 
-        // --- 4. FUNÇÃO PARA DESENHAR O HTML DA FOTO/VÍDEO NA TELA ---
+        // --- 4. EXIBIR NA TELA (ATUALIZADO PARA VÍDEOS) ---
         function displayMediaOnScreen(file) {
             const fileURL = URL.createObjectURL(file); 
             const mediaDiv = document.createElement('div');
             mediaDiv.className = 'media-item';
 
             if (file.type.startsWith('image/')) {
+                // Fotos continuam abrindo em tela cheia ao clicar
                 mediaDiv.innerHTML = `<img src="${fileURL}" alt="Imagem carregada">`;
                 mediaDiv.onclick = () => openModal('image', fileURL);
             } 
             else if (file.type.startsWith('video/')) {
+                // Vídeos agora têm o atributo "controls" para mostrar play/pause/volume diretamente
                 mediaDiv.innerHTML = `
-                    <video src="${fileURL}" muted loop onmouseover="this.play()" onmouseout="this.pause()"></video>
-                    <div class="play-icon">▶</div>
+                    <video src="${fileURL}" controls preload="metadata"></video>
                 `;
-                mediaDiv.onclick = () => openModal('video', fileURL);
+                // Removemos o clique que abria em tela cheia para não interferir com os botões de controle
             }
 
             galleryContainer.appendChild(mediaDiv);
         }
 
-        // --- 5. FUNÇÃO PARA LIMPAR TUDO ---
+        // --- 5. LIMPAR GALERIA ---
         function clearGallery() {
-            if (confirm("Tem certeza que deseja apagar toda a galeria? Isso não apagará os ficheiros originais do seu computador, apenas os removerá desta página.")) {
+            if (confirm("Tem certeza que deseja apagar toda a galeria? Isso não apagará os ficheiros originais do seu computador.")) {
                 const transaction = db.transaction(["medias"], "readwrite");
                 const store = transaction.objectStore("medias");
-                const clearRequest = store.clear(); // Limpa o banco de dados
+                const clearRequest = store.clear();
 
                 clearRequest.onsuccess = function() {
-                    galleryContainer.innerHTML = ''; // Limpa a tela
+                    galleryContainer.innerHTML = ''; 
                 };
             }
         }
 
-        // --- 6. LÓGICA DO LIGHTBOX (MODAL) ---
+        // --- 6. LIGHTBOX ---
         const modal = document.getElementById("mediaModal");
         const modalBody = document.getElementById("modalBody");
 
@@ -310,13 +300,6 @@
                 img.src = url;
                 img.className = 'modal-content';
                 modalBody.appendChild(img);
-            } else if (type === 'video') {
-                const video = document.createElement('video');
-                video.src = url;
-                video.className = 'modal-content';
-                video.controls = true;
-                video.autoplay = true;
-                modalBody.appendChild(video);
             }
         }
 
