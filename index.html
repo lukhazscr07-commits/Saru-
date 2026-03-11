@@ -9,7 +9,8 @@
         :root {
             --bg-color: #121212;
             --text-color: #ffffff;
-            --accent-color: #ff0040;
+            --accent-color: #ff3366;
+            --btn-danger: #ff4444;
         }
 
         * {
@@ -51,15 +52,16 @@
             font-weight: 600;
         }
 
-        /* --- BOTÃO DE UPLOAD --- */
-        .upload-container {
+        /* --- BOTÕES --- */
+        .controls-container {
             text-align: center;
             margin-bottom: 40px;
+            display: flex;
+            justify-content: center;
+            gap: 15px;
         }
 
-        .upload-btn {
-            background-color: var(--accent-color);
-            color: white;
+        .btn {
             padding: 12px 24px;
             border: none;
             border-radius: 8px;
@@ -67,13 +69,28 @@
             cursor: pointer;
             transition: background-color 0.3s;
             font-weight: bold;
+            color: white;
+        }
+
+        .upload-btn {
+            background-color: var(--accent-color);
         }
 
         .upload-btn:hover {
-            background-color: #f6023f;
+            background-color: #e62e5c;
         }
 
-        /* Esconde o input original feio do navegador */
+        .clear-btn {
+            background-color: transparent;
+            border: 2px solid var(--btn-danger);
+            color: var(--btn-danger);
+        }
+
+        .clear-btn:hover {
+            background-color: var(--btn-danger);
+            color: white;
+        }
+
         input[type="file"] {
             display: none;
         }
@@ -95,6 +112,7 @@
             aspect-ratio: 1 / 1;
             box-shadow: 0 10px 20px rgba(0,0,0,0.3);
             transition: transform 0.3s ease;
+            background-color: #222; /* Fundo escuro enquanto carrega */
         }
 
         .media-item:hover {
@@ -165,20 +183,21 @@
 <body>
 
     <header>
-        <img src="Ativo 11.png" alt="O Meu Logótipo" class="logo">
+        <img src="logo.png" alt="O Meu Logótipo" class="logo" onerror="this.style.display='none'">
         <h1>Minha <span>Galeria</span></h1>
         <p>Fotos e Vídeos</p>
     </header>
 
-    <div class="upload-container">
-        <label for="fileInput" class="upload-btn">
-            Carregar Fotos e Vídeos
+    <div class="controls-container">
+        <label for="fileInput" class="btn upload-btn">
+            + Adicionar Mídias
         </label>
         <input type="file" id="fileInput" multiple accept="image/*,video/*">
+        
+        <button class="btn clear-btn" onclick="clearGallery()">Limpar Tudo</button>
     </div>
 
-    <main class="gallery" id="galleryContainer">
-        </main>
+    <main class="gallery" id="galleryContainer"></main>
 
     <div id="mediaModal" class="modal">
         <span class="close" onclick="closeModal()">&times;</span>
@@ -187,41 +206,98 @@
     </div>
 
     <script>
-        // --- LÓGICA DE CARREGAMENTO DE ARQUIVOS ---
-        const fileInput = document.getElementById('fileInput');
         const galleryContainer = document.getElementById('galleryContainer');
+        const fileInput = document.getElementById('fileInput');
+        let db;
 
+        // --- 1. CONFIGURAÇÃO DA BASE DE DADOS DO NAVEGADOR (IndexedDB) ---
+        const request = indexedDB.open("MinhaGaleriaDB", 1);
+
+        request.onupgradeneeded = function(event) {
+            db = event.target.result;
+            // Cria um "cofre" chamado "medias" para guardar os arquivos
+            if (!db.objectStoreNames.contains("medias")) {
+                db.createObjectStore("medias", { autoIncrement: true });
+            }
+        };
+
+        request.onsuccess = function(event) {
+            db = event.target.result;
+            // Assim que a página abre e conecta ao banco, carrega as mídias salvas
+            loadMediaFromDB();
+        };
+
+        request.onerror = function(event) {
+            console.error("Erro ao abrir a base de dados", event);
+            alert("O seu navegador não permite guardar ficheiros localmente.");
+        };
+
+        // --- 2. SALVAR NOVOS ARQUIVOS QUANDO ESCOLHIDOS ---
         fileInput.addEventListener('change', function(event) {
             const files = event.target.files;
             
-            // Limpa a galeria atual se você quiser carregar novos arquivos
-            galleryContainer.innerHTML = '';
+            const transaction = db.transaction(["medias"], "readwrite");
+            const store = transaction.objectStore("medias");
 
             for (let i = 0; i < files.length; i++) {
                 const file = files[i];
-                const fileURL = URL.createObjectURL(file); // Cria um link temporário para o arquivo local
-                
-                const mediaDiv = document.createElement('div');
-                mediaDiv.className = 'media-item';
-
-                // Verifica se é imagem ou vídeo
-                if (file.type.startsWith('image/')) {
-                    mediaDiv.innerHTML = `<img src="${fileURL}" alt="Imagem carregada">`;
-                    mediaDiv.onclick = () => openModal('image', fileURL);
-                } 
-                else if (file.type.startsWith('video/')) {
-                    mediaDiv.innerHTML = `
-                        <video src="${fileURL}" muted loop onmouseover="this.play()" onmouseout="this.pause()"></video>
-                        <div class="play-icon">▶</div>
-                    `;
-                    mediaDiv.onclick = () => openModal('video', fileURL);
-                }
-
-                galleryContainer.appendChild(mediaDiv);
+                // Guarda o ficheiro no banco de dados
+                store.add(file);
+                // Já mostra na tela instantaneamente
+                displayMediaOnScreen(file);
             }
         });
 
-        // --- LÓGICA DO LIGHTBOX (MODAL) ---
+        // --- 3. CARREGAR ARQUIVOS SALVOS AO ABRIR A PÁGINA ---
+        function loadMediaFromDB() {
+            galleryContainer.innerHTML = ''; // Limpa a tela
+            const transaction = db.transaction(["medias"], "readonly");
+            const store = transaction.objectStore("medias");
+            const getAllRequest = store.getAll();
+
+            getAllRequest.onsuccess = function() {
+                const files = getAllRequest.result;
+                files.forEach(file => {
+                    displayMediaOnScreen(file);
+                });
+            };
+        }
+
+        // --- 4. FUNÇÃO PARA DESENHAR O HTML DA FOTO/VÍDEO NA TELA ---
+        function displayMediaOnScreen(file) {
+            const fileURL = URL.createObjectURL(file); 
+            const mediaDiv = document.createElement('div');
+            mediaDiv.className = 'media-item';
+
+            if (file.type.startsWith('image/')) {
+                mediaDiv.innerHTML = `<img src="${fileURL}" alt="Imagem carregada">`;
+                mediaDiv.onclick = () => openModal('image', fileURL);
+            } 
+            else if (file.type.startsWith('video/')) {
+                mediaDiv.innerHTML = `
+                    <video src="${fileURL}" muted loop onmouseover="this.play()" onmouseout="this.pause()"></video>
+                    <div class="play-icon">▶</div>
+                `;
+                mediaDiv.onclick = () => openModal('video', fileURL);
+            }
+
+            galleryContainer.appendChild(mediaDiv);
+        }
+
+        // --- 5. FUNÇÃO PARA LIMPAR TUDO ---
+        function clearGallery() {
+            if (confirm("Tem certeza que deseja apagar toda a galeria? Isso não apagará os ficheiros originais do seu computador, apenas os removerá desta página.")) {
+                const transaction = db.transaction(["medias"], "readwrite");
+                const store = transaction.objectStore("medias");
+                const clearRequest = store.clear(); // Limpa o banco de dados
+
+                clearRequest.onsuccess = function() {
+                    galleryContainer.innerHTML = ''; // Limpa a tela
+                };
+            }
+        }
+
+        // --- 6. LÓGICA DO LIGHTBOX (MODAL) ---
         const modal = document.getElementById("mediaModal");
         const modalBody = document.getElementById("modalBody");
 
